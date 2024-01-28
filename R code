@@ -1,0 +1,592 @@
+rm(list=ls())
+#####################################################
+#libraries###########################################
+#####################################################
+library(coda) #Provides functions for summarizing and plotting the output from Markov Chain Monte Carlo (MCMC) simulations,
+#as well as diagnostic tests of convergence to the equilibrium distribution of the Markov chain.
+library(R2jags) #Providing wrapper functions to implement Bayesian analysis in JAGS. Some major features include monitoring convergence
+#of a MCMC model using Rubin and Gelman Rhat statistics, automatically running a MCMC model till it converges,
+#and implementing parallel processing of a MCMC model for multiple chains.
+library(LaplacesDemon) #Provides a complete environment for Bayesian inference using a variety of different samplers
+library(TeachingDemos) #HPD interval
+library(corrplot) #correlation plot
+library(caTools)#Contains several basic utility functions including: moving (rolling, running) window statistic functions,
+#read/write for GIF and ENVI binary files, fast calculation of AUC, LogitBoost classifier, base64 encoder/decoder,
+#round-off-error-free sum and cumsum, etc.
+library(pROC) #ROC curve
+#####################################################
+#Reading data########################################
+#####################################################
+data = read.csv('D:/SDS2/Project/framingham.csv')
+str(data)
+summary(data)
+#####################################################
+#NA Values###########################################
+#####################################################
+#chacking NA values
+colSums(is.na(data))
+par(mfrow=c(3,3))
+boxplot(data$education, xlab = 'education')
+boxplot(data$cigsPerDay, xlab = 'cigsPerDay')
+boxplot(data$BPMeds, xlab = 'BPMeds')
+boxplot(data$totChol, xlab = 'totChol')
+boxplot(data$BMI, xlab = 'BMI')
+boxplot(data$heartRate, xlab = 'heartRate')
+boxplot(data$glucose, xlab = 'glucose')
+
+#Education
+table(data$education)
+#1    2    3    4 
+#1720 1253  687  473 
+data[is.na(data$education) == TRUE, "education"] = 1
+#cigsPerDay feature
+table(data$cigsPerDay)
+cigsPerDay.median = median(data$cigsPerDay, na.rm = TRUE)
+data[is.na(data$cigsPerDay) == TRUE, "cigsPerDay"] = cigsPerDay.median
+#BPMeds
+table(data$BPMeds)
+#   0    1 
+#4061  124 
+data$BPMeds = NULL
+#totChol
+totChol.median = median(data$totChol, na.rm = TRUE)
+data[is.na(data$totChol) == TRUE, "totChol"] = totChol.median
+#BMI
+BMI.median = median(data$BMI, na.rm = TRUE)
+data[is.na(data$BMI) == TRUE, "BMI"] = BMI.median
+#heartRate
+heartRate.median = median(data$heartRate, na.rm = TRUE)
+data[is.na(data$heartRate) == TRUE, "heartRate"] <- heartRate.median
+#glucose
+glucose.median = median(data$glucose, na.rm = TRUE)
+data[is.na(data$glucose) == TRUE, "glucose"] = glucose.median
+#####################################################
+#Correlation and p-value#############################
+#####################################################
+colSums(is.na(data))
+base_corr = cor(data)[,'TenYearCHD']
+base_corr
+corrplot(cor(data))
+model = glm(TenYearCHD ~ . , data = data, family = binomial(logit))
+summary(model)
+p_values = round(summary(model)$coefficients[,4][2:15],8)
+cbind(p_values,base_corr[1:14])
+
+#####################################################
+#accuracy function###################################
+#####################################################
+accuracy = function(model){
+  pred_model = predict(model,newdata = test[,-15], type = 'response')
+  pred_test = ifelse(pred_model>0.5,1,0)
+  confusion_matrix = table(pred_test, test$TenYearCHD)  
+  acc = (sum(diag(confusion_matrix))/sum(confusion_matrix))*100
+  return(acc)
+}
+#####################################################
+#Base model##########################################
+#####################################################
+#split 0.7###########################################
+set.seed(123)
+split <- sample.split(data$TenYearCHD, SplitRatio = 0.7)
+train <- subset(data, split == TRUE)
+test <- subset(data, split == FALSE)
+#####################################################
+#all variables#######################################
+#####################################################
+model1 = glm(TenYearCHD ~ . , data = train, family = binomial(logit))
+summary(model1)
+accuracy(model = model1)
+#####################################################
+#variables' corr > 0.15##############################
+#####################################################
+base_corr[base_corr>0.1]
+model2 = glm(TenYearCHD ~ age+prevalentHyp+sysBP+diaBP+glucose , data = train, family = binomial(logit))
+summary(model2)
+accuracy(model = model2)
+#####################################################
+#variables' p_values > 0.01##########################
+#####################################################
+p_values[p_values<0.05]
+model3 = glm(TenYearCHD ~ male+age+cigsPerDay+prevalentStroke+sysBP+glucose , data = train, family = binomial(logit))
+summary(model3)
+accuracy(model = model3)
+
+#split 0.8###########################################
+set.seed(123)
+split <- sample.split(data$TenYearCHD, SplitRatio = 0.8)
+train <- subset(data, split == TRUE)
+test <- subset(data, split == FALSE)
+#####################################################
+#all variables#######################################
+#####################################################
+model4 = glm(TenYearCHD ~ . , data = train, family = binomial(logit))
+summary(model4)
+accuracy(model = model4)
+#####################################################
+#variables' corr > 0.15##############################
+#####################################################
+base_corr[base_corr>0.1]
+model5 = glm(TenYearCHD ~ age+prevalentHyp+sysBP+diaBP+glucose , data = train, family = binomial(logit))
+summary(model5)
+accuracy(model = model5)
+#####################################################
+#variables' p_values > 0.01##########################
+#####################################################
+p_values[p_values<0.05]
+model6 = glm(TenYearCHD ~ male+age+cigsPerDay+prevalentStroke+sysBP+glucose , data = train, family = binomial(logit))
+summary(model6)
+accuracy(model = model6)
+
+#split 0.9###########################################
+set.seed(123)
+split <- sample.split(data$TenYearCHD, SplitRatio = 0.9)
+train <- subset(data, split == TRUE)
+test <- subset(data, split == FALSE)
+#####################################################
+#all variables#######################################
+#####################################################
+model7 = glm(TenYearCHD ~ . , data = train, family = binomial(logit))
+summary(model7)
+accuracy(model = model7)
+#####################################################
+#variables' corr > 0.15##############################
+#####################################################
+base_corr[base_corr>0.1]
+model8 = glm(TenYearCHD ~ age+prevalentHyp+sysBP+diaBP+glucose , data = train, family = binomial(logit))
+summary(model8)
+accuracy(model = model8)
+#####################################################
+#variables' p_values > 0.01##########################
+#####################################################
+p_values[p_values<0.05]
+model9 = glm(TenYearCHD ~ male+age+cigsPerDay+prevalentStroke+sysBP+glucose , data = train, family = binomial(logit))
+summary(model9)
+accuracy(model = model9)
+#####################################################
+#####################################################
+#Feature engineering#################################
+#####################################################
+#####################################################
+data$map = as.integer(((2*data$diaBP) + data$sysBP)/3) #mean blood pressure
+data$tpr = (data$map * data$diaBP) / 5 #Total peripheral resistance
+data$co = data$map/ data$tpr #cardiac output
+data$sv = data$co / data$heartRate
+data$hbp = data$sysBP/data$diaBP #blood pressure
+
+
+#####################################################
+#Correlation and p-value#############################
+#####################################################
+base_corr = cor(data)[,'TenYearCHD']
+corrplot(cor(data))
+model = glm(TenYearCHD ~ . , data = data, family = binomial(logit))
+summary(model)
+p_values = round(summary(model)$coefficients[,4][2:20],8)
+cbind(p_values,base_corr[-which(base_corr==1)])
+
+#####################################################
+#feature model#######################################
+#####################################################
+#split 0.7###########################################
+set.seed(123)
+split <- sample.split(data$TenYearCHD, SplitRatio = 0.7)
+train <- subset(data, split == TRUE)
+test <- subset(data, split == FALSE)
+#####################################################
+#all variables#######################################
+#####################################################
+model1 = glm(TenYearCHD ~ . , data = train, family = binomial(logit))
+summary(model1)
+accuracy(model = model1)
+#####################################################
+#variables' corr > 0.15##############################
+#####################################################
+base_corr[base_corr>0.1]
+model2 = glm(TenYearCHD ~ age+prevalentHyp+sysBP+diaBP+glucose+map+tpr+hbp , data = train, family = binomial(logit))
+summary(model2)
+accuracy(model = model2)
+#####################################################
+#variables' p_values > 0.1##########################
+#####################################################
+p_values[p_values<0.1]
+model3 = glm(TenYearCHD ~ male+age+cigsPerDay+prevalentStroke+totChol+sysBP+diaBP+glucose+map , data = train, family = binomial(logit))
+summary(model3)
+accuracy(model = model3)
+#split 0.8###########################################
+set.seed(123)
+split <- sample.split(data$TenYearCHD, SplitRatio = 0.8)
+train <- subset(data, split == TRUE)
+test <- subset(data, split == FALSE)
+#####################################################
+#all variables#######################################
+#####################################################
+model4 = glm(TenYearCHD ~ . , data = train, family = binomial(logit))
+summary(model4)
+accuracy(model = model4)
+#####################################################
+#variables' corr > 0.15##############################
+#####################################################
+base_corr[base_corr>0.1]
+model5 = glm(TenYearCHD ~ age+prevalentHyp+sysBP+diaBP+glucose+map+tpr+hbp , data = train, family = binomial(logit))
+summary(model5)
+accuracy(model = model5)
+#####################################################
+#variables' p_values > 0.01##########################
+#####################################################
+p_values[p_values<0.1]
+model6 = glm(TenYearCHD ~ male+age+cigsPerDay+prevalentStroke+totChol+sysBP+diaBP+glucose+map , data = train, family = binomial(logit))
+summary(model6)
+accuracy(model = model6)
+
+#split 0.9###########################################
+set.seed(123)
+split <- sample.split(data$TenYearCHD, SplitRatio = 0.9)
+train <- subset(data, split == TRUE)
+test <- subset(data, split == FALSE)
+#####################################################
+#all variables#######################################
+#####################################################
+model7 = glm(TenYearCHD ~ . , data = train, family = binomial(logit))
+summary(model7)
+accuracy(model = model7)
+#####################################################
+#variables' corr > 0.15##############################
+#####################################################
+base_corr[base_corr>0.1]
+model8 = glm(TenYearCHD ~ age+prevalentHyp+sysBP+diaBP+glucose+map+tpr+hbp , data = train, family = binomial(logit))
+summary(model8)
+accuracy(model = model8)
+#####################################################
+#variables' p_values > 0.01##########################
+#####################################################
+p_values[p_values<0.1]
+model9 = glm(TenYearCHD ~ male+age+cigsPerDay+prevalentStroke+totChol+sysBP+diaBP+glucose+map , data = train, family = binomial(logit))
+summary(model9)
+accuracy(model = model9)
+
+#####################################################
+#Chosen Model#Binomial###############################
+#male+age+cigsPerDay+prevalentStroke+sysBP+glucose###
+#split ratio = 0.9###################################
+#####################################################
+set.seed(123)
+split <- sample.split(data$TenYearCHD, SplitRatio = 0.9)
+train <- subset(data, split == TRUE)
+test <- subset(data, split == FALSE)
+model_binom = glm(TenYearCHD ~ male+age+cigsPerDay+prevalentStroke+sysBP+glucose ,
+                  data = train, family = binomial(logit))
+summary(model_binom)
+#AIC: 2912.9
+accuracy(model_binom)
+#85.5792
+
+#####################################################
+#JAGS################################################
+#####################################################
+bern_model <- function() {
+  for (i in 1:N) {
+    y[i] ~ dbern(p[i])
+    logit(p[i]) = beta0+(beta1*x1[i])+(beta2*x2[i])+(beta3*x3[i])+(beta4*x4[i])+
+      (beta5*x5[i])+(beta6*x6[i])}
+  beta0 ~ dnorm(0,1.0E-3)
+  beta1 ~ dnorm(0,1.0E-3)
+  beta2 ~ dnorm(0,1.0E-3)
+  beta3 ~ dnorm(0,1.0E-3)
+  beta4 ~ dnorm(0,1.0E-3)
+  beta5 ~ dnorm(0,1.0E-3)
+  beta6 ~ dnorm(0,1.0E-3)
+}
+
+data.list = with(train,list(y=train$TenYearCHD,x1=train$male,x2=train$age,x3=train$cigsPerDay,
+                            x4=train$prevalentStroke,x5=train$sysBP,x6=train$glucose, N=nrow(train)))
+params= c("beta0","beta1","beta2","beta3","beta4","beta5","beta6")
+dat.logit.jags = jags(data=data.list, inits=NULL, model.file=bern_model, param=params,
+                      n.chains = 6, n.iter = 6000, n.burnin = 1000, n.thin = 1)
+
+#####################################################
+#Plots of JAGS#######################################
+#####################################################
+TT<-seq(1,(6000-1000),1)
+par(mfrow=c(3,3))
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[0]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[1]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[2]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[3]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[4]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[5]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[5]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"])/TT,col="red")
+
+par(mfrow=c(3,3))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"],main= expression(beta[0]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"],main= expression(beta[1]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"],main= expression(beta[2]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"],main= expression(beta[3]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"],main= expression(beta[4]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"],main= expression(beta[5]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"],main= expression(beta[6]))
+
+par(mfrow=c(3,3))
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"],freq=FALSE,col="blue",main= expression(beta[0]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"],freq=FALSE,col="blue",main= expression(beta[1]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"],freq=FALSE,col="blue",main= expression(beta[2]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"],freq=FALSE,col="blue",main= expression(beta[3]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"],freq=FALSE,col="blue",main= expression(beta[4]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"],freq=FALSE,col="blue",main= expression(beta[5]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"],freq=FALSE,col="blue",main= expression(beta[6]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"]),col="red")
+
+#####################################################
+#Evaluation of JAGS##################################
+#####################################################
+beta.vec = cbind(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"],dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"],
+                 dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"],dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"],
+                 dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"],dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"],
+                 dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"])
+eval_result = matrix(NA,7,4)
+for(i in 1:7){
+  K1<-geweke.diag(beta.vec[,i], frac1=0.1, frac2=0.5)$z
+  K2<-raftery.diag(beta.vec[,i], q=0.025, r=0.005, s=0.95, converge.eps=0.001)$resmatrix[4]
+  K3<-heidel.diag(beta.vec[,i], eps=0.1, pvalue=0.05)[3]
+  mc.error<-MCSE(beta.vec[,i],method="sample.variance")    
+
+  eval_result[i,]<-c(mc.error,K1,K2,K3)
+}
+rownames(eval_result)=c("Beta0","Beta1","Beta2","Beta3","Beta4","Beta5","Beta6")
+colnames(eval_result)=c("MC error","geweke","raftery","heidel")
+round(t(eval_result),4)
+
+#####################################################
+#Confidence Intervals################################
+#####################################################
+ci_classic = confint(model_binom, level = 0.95)
+length_ci_classic = ci_classic[,2] - ci_classic[,1]
+inter_result = matrix(NA,7,9)
+for(i in 1:7){
+  HPD<-emp.hpd(beta.vec[,i],conf=0.95)
+  EQ<-quantile(beta.vec[,i],probs=c(0.025,0.975),names=F)
+  
+  inter_result[i,]<-c(ci_classic[i,],length_ci_classic[i],HPD,diff(HPD),EQ,diff(EQ))
+}
+rownames(inter_result)=c("Beta0","Beta1","Beta2","Beta3","Beta4","Beta5","Beta6")
+colnames(inter_result)=c("lower.classic","upper.classic","length.classic","lower.HPD","upper.HPD",
+                   "length.HPD","lower.EQ","upper.EQ","length.EQ")
+round(t(inter_result),4)
+
+#####################################################
+#mean, quantile and ...##############################
+#####################################################
+mean_beta0 = as.numeric(model_binom$coefficients[1])
+mean_beta1 = as.numeric(model_binom$coefficients[2])
+mean_beta2 = as.numeric(model_binom$coefficients[3])
+mean_beta3 = as.numeric(model_binom$coefficients[4])
+mean_beta4 = as.numeric(model_binom$coefficients[5])
+mean_beta5 = as.numeric(model_binom$coefficients[6])
+mean_beta5 = as.numeric(model_binom$coefficients[7])
+Beta_hat_vec_classic = c(mean_beta0,mean_beta1,mean_beta2,mean_beta3,mean_beta4,mean_beta5,mean_beta5)
+other_result = matrix(NA,7,6)
+for(i in 1:7){
+  Quan<-quantile(beta.vec[,i],probs=c(0.025,0.5,0.975),names=F)
+  other_result[i,]<-c(Beta_hat_vec_classic[i],mean(beta.vec[,i]),sd(beta.vec[,i]),Quan)
+}
+rownames(other_result)=c("Beta0","Beta1","Beta2","Beta3","Beta4","Beta5","Beta6")
+colnames(other_result)=c("beta.hat.classic","beta.hat.bayes","sd",
+                    "2.5%","median","97.5%")
+round(t(other_result),4)
+
+round(t(inter_result),4)[c(3,6,9),]
+#####################################################
+#using beyas factors in prediction###################
+#####################################################
+model<- function(beta){
+  mod=beta[1]+(beta[2]*test$male)+(beta[3]*test$age)+(beta[4]*test$cigsPerDay)+(beta[5]*test$prevalentStroke)+
+    (beta[6]*test$sysBP)+(beta[7]*test$glucose)
+  return(exp(mod)/(1+exp(mod)))
+}
+
+new_pred_model = model(c(-8.483,0.443,0.063,0.023,0.958,0.018,0.008))
+
+pred_test = ifelse(new_pred_model>0.5,1,0)
+confusion_matrix = table(pred_test, test$TenYearCHD)
+acc = (sum(diag(confusion_matrix))/sum(confusion_matrix))*100
+acc
+#85.5792
+
+roc(train$TenYearCHD, model_binom$fitted.values, plot=TRUE)
+#####################################################
+#####################################################
+#####################################################
+#####################################################
+#####################################################
+#Chosen Model#Binomial###############################
+#male+age+cigsPerDay+prevalentStroke+sysBP+glucose###
+#split ratio = 0.9###################################
+#####################################################
+set.seed(123)
+model_pois = glm(TenYearCHD ~ male+age+cigsPerDay+prevalentStroke+sysBP+glucose ,
+                  data = train, family = poisson(link = "log"))
+summary(model_pois)
+#AIC: 3081.2
+accuracy(model_pois)
+#85.5792
+
+#####################################################
+#JAGS################################################
+#####################################################
+bern_model <- function() {
+  for (i in 1:N) {
+    y[i] ~ dpois(lambda[i])
+    log(lambda[i]) = beta0+(beta1*x1[i])+(beta2*x2[i])+(beta3*x3[i])+(beta4*x4[i])+
+      (beta5*x5[i])+(beta6*x6[i])
+    }
+  beta0 ~ dnorm(0,1.0E-3)
+  beta1 ~ dnorm(0,1.0E-3)
+  beta2 ~ dnorm(0,1.0E-3)
+  beta3 ~ dnorm(0,1.0E-3)
+  beta4 ~ dnorm(0,1.0E-3)
+  beta5 ~ dnorm(0,1.0E-3)
+  beta6 ~ dnorm(0,1.0E-3)
+}
+
+data.list = with(train,list(y=train$TenYearCHD,x1=train$male,x2=train$age,x3=train$cigsPerDay,
+                            x4=train$prevalentStroke,x5=train$sysBP,x6=train$glucose, N=nrow(train)))
+params= c("beta0","beta1","beta2","beta3","beta4","beta5","beta6")
+dat.logit.jags = jags(data=data.list, inits=NULL, model.file=bern_model, param=params,
+                      n.chains = 6, n.iter = 15000, n.burnin = 1000, n.thin = 1)
+
+#####################################################
+#Plots of JAGS#######################################
+#####################################################
+TT<-seq(1,(15000-1000),1)
+par(mfrow=c(3,3))
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[0]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[1]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[2]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[3]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[4]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[5]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"])/TT,col="red")
+plot(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"],type="l", col="blue", xlab="Iteration", ylab= expression(beta[5]))
+lines(TT,cumsum(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"])/TT,col="red")
+
+par(mfrow=c(3,3))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"],main= expression(beta[0]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"],main= expression(beta[1]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"],main= expression(beta[2]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"],main= expression(beta[3]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"],main= expression(beta[4]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"],main= expression(beta[5]))
+acf(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"],main= expression(beta[6]))
+
+par(mfrow=c(3,3))
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"],freq=FALSE,col="blue",main= expression(beta[0]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"],freq=FALSE,col="blue",main= expression(beta[1]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"],freq=FALSE,col="blue",main= expression(beta[2]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"],freq=FALSE,col="blue",main= expression(beta[3]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"],freq=FALSE,col="blue",main= expression(beta[4]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"],freq=FALSE,col="blue",main= expression(beta[5]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"]),col="red")
+hist(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"],freq=FALSE,col="blue",main= expression(beta[6]),xlab="")
+lines(density(dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"]),col="red")
+
+#####################################################
+#Evaluation of JAGS##################################
+#####################################################
+beta.vec = cbind(dat.logit.jags$BUGSoutput$sims.array[,1,"beta0"],dat.logit.jags$BUGSoutput$sims.array[,1,"beta1"],
+                 dat.logit.jags$BUGSoutput$sims.array[,1,"beta2"],dat.logit.jags$BUGSoutput$sims.array[,1,"beta3"],
+                 dat.logit.jags$BUGSoutput$sims.array[,1,"beta4"],dat.logit.jags$BUGSoutput$sims.array[,1,"beta5"],
+                 dat.logit.jags$BUGSoutput$sims.array[,1,"beta6"])
+eval_result = matrix(NA,7,4)
+for(i in 1:7){
+  K1<-geweke.diag(beta.vec[,i], frac1=0.1, frac2=0.5)$z
+  K2<-raftery.diag(beta.vec[,i], q=0.025, r=0.005, s=0.95, converge.eps=0.001)$resmatrix[4]
+  K3<-heidel.diag(beta.vec[,i], eps=0.1, pvalue=0.05)[3]
+  mc.error<-MCSE(beta.vec[,i],method="sample.variance")    
+  
+  eval_result[i,]<-c(mc.error,K1,K2,K3)
+}
+rownames(eval_result)=c("Beta0","Beta1","Beta2","Beta3","Beta4","Beta5","Beta6")
+colnames(eval_result)=c("MC error","geweke","raftery","heidel")
+round(t(eval_result),4)
+
+#####################################################
+#Confidence Intervals################################
+#####################################################
+ci_classic = confint(model_pois, level = 0.95)
+length_ci_classic = ci_classic[,2] - ci_classic[,1]
+inter_result = matrix(NA,7,9)
+for(i in 1:7){
+  HPD<-emp.hpd(beta.vec[,i],conf=0.95)
+  EQ<-quantile(beta.vec[,i],probs=c(0.025,0.975),names=F)
+  
+  inter_result[i,]<-c(ci_classic[i,],length_ci_classic[i],HPD,diff(HPD),EQ,diff(EQ))
+}
+rownames(inter_result)=c("Beta0","Beta1","Beta2","Beta3","Beta4","Beta5","Beta6")
+colnames(inter_result)=c("lower.classic","upper.classic","length.classic","lower.HPD","upper.HPD",
+                         "length.HPD","lower.EQ","upper.EQ","length.EQ")
+round(t(inter_result),4)
+
+#####################################################
+#mean, quantile and ...##############################
+#####################################################
+mean_beta0 = as.numeric(model_pois$coefficients[1])
+mean_beta1 = as.numeric(model_pois$coefficients[2])
+mean_beta2 = as.numeric(model_pois$coefficients[3])
+mean_beta3 = as.numeric(model_pois$coefficients[4])
+mean_beta4 = as.numeric(model_pois$coefficients[5])
+mean_beta5 = as.numeric(model_pois$coefficients[6])
+mean_beta5 = as.numeric(model_pois$coefficients[7])
+Beta_hat_vec_classic = c(mean_beta0,mean_beta1,mean_beta2,mean_beta3,mean_beta4,mean_beta5,mean_beta5)
+other_result = matrix(NA,7,6)
+for(i in 1:7){
+  Quan<-quantile(beta.vec[,i],probs=c(0.025,0.5,0.975),names=F)
+  other_result[i,]<-c(Beta_hat_vec_classic[i],mean(beta.vec[,i]),sd(beta.vec[,i]),Quan)
+}
+rownames(other_result)=c("Beta0","Beta1","Beta2","Beta3","Beta4","Beta5","Beta6")
+colnames(other_result)=c("beta.hat.classic","beta.hat.bayes","sd",
+                         "2.5%","median","97.5%")
+round(t(other_result),4)
+
+round(t(inter_result),4)[c(3,6,9),]
+#####################################################
+#using beyas factors in prediction###################
+#####################################################
+model<- function(beta){
+  mod=beta[1]+(beta[2]*test$male)+(beta[3]*test$age)+(beta[4]*test$cigsPerDay)+(beta[5]*test$prevalentStroke)+
+    (beta[6]*test$sysBP)+(beta[7]*test$glucose)
+  return(exp(mod)/(1+exp(mod)))
+}
+
+new_pred_model = model(c(-8.483,0.443,0.063,0.023,0.958,0.018,0.008))
+
+pred_test = ifelse(new_pred_model>0.5,1,0)
+confusion_matrix = table(pred_test, test$TenYearCHD)
+acc = (sum(diag(confusion_matrix))/sum(confusion_matrix))*100
+acc
+#85.5792
+
+roc(train$TenYearCHD, model_pois$fitted.values, plot=TRUE)
+
+dat.logit.jags
